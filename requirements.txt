@@ -1,0 +1,39 @@
+# Dependências do Sistema RAG - Polícia Federal
+# Versões testadas e compatíveis
+
+# Core LangChain
+langchain>=0.1.0
+langchain-community>=0.0.20
+langchain-core>=0.1.0
+
+# Ollama Integration
+langchain-ollama>=0.1.0
+
+# PDF Processing
+pypdf>=6.0.0
+
+# Vector Database
+faiss-cpu>=1.7.4
+
+# HTTP Requests
+requests>=2.31.0
+
+# Utilities (já incluídas no Python padrão, mas listadas para referência)
+# os (built-in)
+# sys (built-in)
+# json (built-in)
+# hashlib (built-in)
+# glob (built-in)
+# time (built-in)
+# functools (built-in)
+
+# Dependências opcionais para melhorias futuras
+# sentence-transformers>=2.2.0  # Para embeddings alternativos
+# chromadb>=0.4.0               # Vector DB alternativo
+# streamlit>=1.28.0             # Para interface web
+# gradio>=4.0.0                 # Para interface web alternativa
+
+# Desenvolvimento e testes
+# pytest>=7.0.0                 # Para testes
+# black>=23.0.0                 # Para formatação de código
+# flake8>=6.0.0                 # Para linting
