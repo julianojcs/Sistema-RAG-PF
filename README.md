@@ -20,7 +20,7 @@ Sistema de Recuperação e Geração Aumentada (RAG) para consulta de legislaç�
 ## 🛠️ Instalação Rápida
 
 ### Windows
-```bash
+```cmd
 install.bat
 ```
 
@@ -60,36 +60,62 @@ ollama pull llama3.2
 
 ```
 RAG/
-├── main.py                 # Sistema principal
-├── requirements.txt        # Dependências Python
-├── install.sh             # Script instalação Linux/Mac
-├── install.bat            # Script instalação Windows
-├── SGP/                   # Pasta com documentos PDF
+├── main.py                     # 🎯 Orquestrador principal (80 linhas)
+├── requirements.txt            # 📦 Dependências Python
+├── install.sh                 # 🐧 Script instalação Linux/Mac
+├── install.bat                # 🪟 Script instalação Windows
+├── docs/                      # 📚 Documentação completa
+│   ├── README.md              # 📁 Índice da documentação
+│   ├── CHANGELOG.md           # 📋 Histórico detalhado de mudanças
+│   ├── ARCHITECTURE.md        # 🏗️ Arquitetura e decisões técnicas
+│   └── DOCUMENTATION_GUIDE.md # 📝 Guia de documentação
+├── src/                       # 📂 Código fonte modular
+│   ├── config/
+│   │   └── settings.py        # ⚙️ Configurações centralizadas
+│   ├── core/
+│   │   └── rag_service.py     # 🧠 Lógica principal RAG
+│   ├── services/
+│   │   ├── document_service.py # 📄 Processamento de documentos
+│   │   └── ollama_service.py   # 🔌 Conectividade Ollama
+│   └── utils/
+│       ├── cache_utils.py     # ⚡ Sistema de cache otimizado
+│       └── file_utils.py      # 📁 Operações com arquivos
+├── docs/                      # 📚 Documentação técnica
+│   ├── ARCHITECTURE.md        # 🏗️ Arquitetura e decisões técnicas
+│   └── DOCUMENTATION_GUIDE.md # 📝 Guia de documentação
+├── SGP/                       # 📚 Documentos PDF fonte
 │   ├── documento1.pdf
 │   └── documento2.pdf
-└── faissDB/               # Base de dados (criada automaticamente)
-    ├── index.faiss
-    ├── index.pkl
-    ├── sgp_hash.json
-    └── cache_respostas.json
+└── faissDB/                   # 🗃️ Base de dados vetorial (auto-criada)
+    ├── index.faiss           # 🔍 Índice de busca semântica
+    ├── index.pkl             # 📊 Metadados da base
+    ├── sgp_hash.json         # 🔐 Hash para detecção de mudanças
+    └── cache_respostas.json  # ⚡ Cache de respostas persistente
 ```
 
 ## 🔧 Configurações Avançadas
 
 ### Modelos Alternativos (mais rápidos)
 ```python
-# No main.py, linha ~204:
-llm = OllamaLLM(model="mistral:7b")  # Mais rápido que llama3.2
+# Em src/config/settings.py:
+LLM_MODEL = "mistral:7b"        # Mais rápido que llama3.2
 # ou
-llm = OllamaLLM(model="qwen2:7b")    # Alternativa rápida
+LLM_MODEL = "qwen2:7b"          # Alternativa rápida
 ```
 
-### Ajustar Número de Chunks
+### Ajustar Parâmetros de Busca
 ```python
-# No main.py, linha ~287:
-retriever = database.as_retriever(search_kwargs={"k": 4})  # Mais rápido
+# Em src/config/settings.py:
+RETRIEVAL_K = 4                 # Mais rápido (menos chunks)
 # ou
-retriever = database.as_retriever(search_kwargs={"k": 8})  # Mais preciso
+RETRIEVAL_K = 8                 # Mais preciso (mais chunks)
+```
+
+### Personalizar Chunking
+```python
+# Em src/config/settings.py:
+CHUNK_SIZE = 300               # Chunks menores = mais precisão
+CHUNK_OVERLAP = 100            # Menos overlap = mais velocidade
 ```
 
 ## 🐛 Solução de Problemas
@@ -127,14 +153,43 @@ pip install pypdf
 - **Detecção de mudanças** por hash MD5
 - **Feedback em tempo real** de progresso
 
-## 🔮 Melhorias Futuras
+## � Histórico de Versões
 
-- Interface web com Streamlit/Gradio
-- Busca híbrida (semântica + keyword)
-- Streaming de respostas
-- Suporte a mais formatos (DOCX, TXT)
-- API REST para integração
-- Dashboard de métricas
+### 🆕 v2.0.0 - Arquitetura Modular (Atual)
+- ✅ **Sistema modularizado** em 7 componentes especializados
+- ✅ **main.py otimizado** de 400+ para 80 linhas
+- ✅ **Separação de responsabilidades** clara
+- ✅ **Manutenibilidade** e testabilidade aprimoradas
+
+### v1.2.0 - Sistema Otimizado
+- ✅ **Cache de respostas** (99% melhoria: 47s → 0.01s)
+- ✅ **Detecção automática** de mudanças nos documentos
+- ✅ **Reconexão automática** com Ollama
+- ✅ **Performance otimizada** com retrieval k=6
+
+### v1.1.0 - RAG Básico
+- ✅ **Sistema RAG** inicial com LangChain
+- ✅ **Processamento PDF** automático
+- ✅ **Base FAISS** para busca semântica
+- ✅ **Interface CLI** interativa
+
+## 🔮 Roadmap Futuro
+
+### v2.1.0 - Interface Web
+- [ ] Streamlit/Gradio UI
+- [ ] Upload de arquivos via web
+- [ ] Dashboard de métricas em tempo real
+
+### v2.2.0 - API REST
+- [ ] FastAPI backend
+- [ ] Endpoints RESTful para consultas
+- [ ] Documentação OpenAPI/Swagger
+
+### v3.0.0 - IA Avançada
+- [ ] Busca híbrida (semântica + keyword)
+- [ ] Reranking de resultados
+- [ ] Streaming de respostas
+- [ ] Suporte multilíngue
 
 ## 📞 Suporte
 
@@ -143,6 +198,13 @@ Para dúvidas ou problemas:
 2. Confirme que Ollama está rodando
 3. Teste com documentos pequenos primeiro
 4. Verifique conexão de rede
+
+## 📚 Documentação Adicional
+
+- 📋 **[Histórico de Mudanças](docs/CHANGELOG.md)** - Todas as versões e implementações
+- 🏗️ **[Arquitetura Técnica](docs/ARCHITECTURE.md)** - Detalhes técnicos e decisões de design
+- 📝 **[Guia de Documentação](docs/DOCUMENTATION_GUIDE.md)** - Como manter a documentação atualizada
+- 📁 **[Índice da Documentação](docs/README.md)** - Navegação organizada
 
 ---
 
