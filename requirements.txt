@@ -4,6 +4,7 @@
 # Core LangChain
 langchain>=0.1.0
 langchain-community>=0.0.20
+langchain-qdrant>=0.1.4
 langchain-core>=0.1.0
 
 # Ollama Integration
@@ -11,9 +12,15 @@ langchain-ollama>=0.1.0
 
 # PDF Processing
 pypdf>=6.0.0
+pdfminer.six>=20231228
+pdf2image>=1.17.0
+pytesseract>=0.3.10
+Pillow>=10.0.0
 
 # Vector Database
 faiss-cpu>=1.7.4
+qdrant-client>=1.9.0
+fastembed>=0.3.6  # optional: Qdrant's local embedding helper (not required here)
 
 # HTTP Requests
 requests>=2.31.0
@@ -31,9 +38,13 @@ requests>=2.31.0
 # sentence-transformers>=2.2.0  # Para embeddings alternativos
 # chromadb>=0.4.0               # Vector DB alternativo
 # streamlit>=1.28.0             # Para interface web
+# qdrant-client>=1.9.0          # DB vetorial alternativo (embedded)
 # gradio>=4.0.0                 # Para interface web alternativa
 
 # Desenvolvimento e testes
-# pytest>=7.0.0                 # Para testes
+pytest>=7.0.0                 # Para testes
+rank-bm25>=0.2.2             # BM25 para busca híbrida
+sentence-transformers>=2.7.0 # Embeddings multilíngues alternativos
+streamlit>=1.33.0            # Interface web
 # black>=23.0.0                 # Para formatação de código
 # flake8>=6.0.0                 # Para linting

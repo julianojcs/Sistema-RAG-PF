@@ -48,12 +48,12 @@ class OllamaService:
         else:
             print(f"❓ Erro: {error_code}")
 
-        print("\n📋 Passos para configurar Ollama:")
-        print("1. Baixe: https://ollama.ai/")
-        print("2. Execute: ollama pull nomic-embed-text")
-        print("3. Execute: ollama pull llama3.2")
-        print("4. Inicie: ollama serve")
-        print("\n⚡ O sistema continuará rodando e tentará reconectar automaticamente...")
+    print("\n📋 Passos para configurar Ollama (uso local/offline):")
+    print("1. Baixe: https://ollama.ai/")
+    print("2. Execute: ollama pull nomic-embed-text")
+    print("3. Execute: ollama pull llama3.2")
+    print("4. Inicie: ollama serve")
+    print("\n⚡ O sistema continuará rodando e tentará reconectar automaticamente...")
 
     @staticmethod
     def print_processing_error(error_str: str) -> None:

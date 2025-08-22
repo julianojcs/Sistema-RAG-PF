@@ -15,7 +15,7 @@ class FileUtils:
     @staticmethod
     def get_pdf_files() -> List[str]:
         """Retorna lista de arquivos PDF na pasta SGP"""
-        return glob.glob(f"{Settings.SGP_FOLDER}/*.pdf")
+        return glob.glob(f"{Settings.PDF_FOLDER}/*.pdf")
 
     @staticmethod
     def generate_folder_hash() -> str:
@@ -38,7 +38,7 @@ class FileUtils:
             return hashlib.md5(hash_string.encode()).hexdigest()
 
         except Exception as e:
-            print(f"⚠️ Erro ao verificar pasta SGP: {e}")
+            print(f"⚠️ Erro ao verificar pasta {Settings.PDF_FOLDER}: {e}")
             return "erro"
 
     @staticmethod

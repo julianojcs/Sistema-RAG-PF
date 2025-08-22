@@ -58,6 +58,15 @@ class CacheUtils:
         """Retorna tamanho do cache"""
         return len(self.cache_respostas)
 
+    def clear_all(self) -> None:
+        """Limpa completamente o cache em memória e no disco."""
+        self.cache_respostas = {}
+        try:
+            if os.path.exists(Settings.CACHE_FILE):
+                os.remove(Settings.CACHE_FILE)
+        except Exception:
+            pass
+
     @lru_cache(maxsize=Settings.CACHE_LRU_SIZE)
     def semantic_search_cache(self, pergunta_hash: str, k: int = Settings.RETRIEVAL_K):
         """Cache LRU para buscas semânticas"""

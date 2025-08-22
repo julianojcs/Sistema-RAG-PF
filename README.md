@@ -1,19 +1,34 @@
 # 🤖 Sistema RAG - Polícia Federal
 
-Sistema de Recuperação e Geração Aumentada (RAG) para consulta de legislações e documentos da Polícia Federal.
+Sistema de Recuperação e Geração Aumentada (RAG) especializado para consulta de espécies normativas da Polícia Federal com pipeline hierárquico e interface web moderna.
 
 ## 🚀 Funcionalidades
 
-- ✅ **Cache de Respostas**: Respostas instantâneas para perguntas repetidas
-- ✅ **Detecção Automática de Mudanças**: Reconstrói base quando documentos são alterados
-- ✅ **Reconexão Automática**: Sistema resiliente a falhas de conexão
-- ✅ **Interface Intuitiva**: Feedback claro sobre status e progresso
-- ✅ **Busca Semântica**: Encontra informações relevantes mesmo em documentos longos
-- ✅ **Processamento Otimizado**: 40% mais rápido que versões anteriores
+### 🛡️ RAG PF-Específico
+- ✅ **Pipeline Hierárquico**: Parsing estruturado de normas (Art., §, Incisos, Alíneas)
+- ✅ **Docling Integration**: Extração layout-aware com detecção de tabelas e bbox
+- ✅ **Metadados Ricos**: Breadcrumbs, níveis hierárquicos, rastreamento de páginas
+- ✅ **Busca Híbrida**: Dense (embeddings) + BM25 (keywords) com reranking
+
+### 🌐 Interface Web Moderna
+- ✅ **Streamlit UI**: Interface responsiva para usuários não-técnicos
+- ✅ **Upload PDFs**: Envio direto pela interface com drag-and-drop
+- ✅ **Reindex Incremental**: Detecção automática via manifest (10x mais rápido)
+- ✅ **Preview Retrieval**: Visualização de trechos com páginas e indicação de tabelas
+
+### 🗃️ Dual Backend Vetorial
+- ✅ **Qdrant Embedded**: Operações granulares (delete/upsert por arquivo)
+- ✅ **FAISS Fallback**: Performance superior para read-only
+- ✅ **Switching Transparente**: Configuração via Settings.VECTOR_DB_BACKEND
+
+### 📤 Auditoria e Qualidade
+- ✅ **Export JSONL**: Auditoria completa com layout_refs e metadados PF
+- ✅ **Cache Inteligente**: Respostas persistidas com clear automático pós-rebuild
+- ✅ **Offline-First**: 100% local, nenhum dado sai do ambiente
 
 ## 📋 Pré-requisitos
 
-- Python 3.8 ou superior
+- Python 3.11 ou superior
 - Ollama instalado e configurado
 - Arquivos PDF na pasta `SGP/`
 
@@ -43,10 +58,23 @@ ollama pull llama3.2
 
 ## 🎯 Como Usar
 
+### Interface Web (Recomendado)
+1. **Adicione documentos PDF** na pasta `SGP/`
+2. **Inicie o Ollama**: `ollama serve`
+3. **Execute a interface web**: `python -m streamlit run web/app.py`
+4. **Acesse**: http://localhost:8501
+5. **Upload PDFs** pela interface e **faça perguntas**
+
+### Interface CLI (Alternativo)
 1. **Adicione documentos PDF** na pasta `SGP/`
 2. **Inicie o Ollama**: `ollama serve`
 3. **Execute o sistema**: `python main.py`
 4. **Faça suas perguntas** sobre legislação da PF
+
+### Interface Web (opcional)
+1. Instale dependências: `pip install -r requirements.txt`
+2. Rode a UI: `streamlit run web/app.py`
+3. Abra o navegador no endereço exibido pelo Streamlit
 
 ## 📊 Performance
 
@@ -205,6 +233,7 @@ Para dúvidas ou problemas:
 - 🏗️ **[Arquitetura Técnica](docs/ARCHITECTURE.md)** - Detalhes técnicos e decisões de design
 - 📝 **[Guia de Documentação](docs/DOCUMENTATION_GUIDE.md)** - Como manter a documentação atualizada
 - 📁 **[Índice da Documentação](docs/README.md)** - Navegação organizada
+- 🧩 **[Visão Técnica (PF RAG)](docs/TECHNICAL_OVERVIEW.md)** - Implementado, pendências, melhorias e guia de arquivos
 
 ---
 

@@ -16,29 +16,28 @@ from ..services.ollama_service import OllamaService
 class RAGService:
     """Serviço principal para consultas RAG"""
 
-    def __init__(self):
+    def __init__(self, progress_callback=None):
         self.cache = CacheUtils()
         self.document_service = DocumentService()
         self.qa_chain = None
-        self._initialize_chain()
+        self._initialize_chain(progress_callback)
 
-    def _initialize_chain(self):
+    def _initialize_chain(self, progress_callback=None):
         """Inicializa a cadeia RAG"""
         print("🤖 Inicializando sistema RAG...")
 
         # Carrega/cria base de dados
-        database = self.document_service.load_or_create_database()
+        database = self.document_service.load_or_create_database(progress_callback)
         if not database:
             print("❌ Falha ao carregar base de dados")
             sys.exit(1)
 
-        # Verifica conexão com Ollama
+        # Verifica conexão com Ollama para o LLM
         conectado, erro = OllamaService.check_connection()
         if not conectado:
             print("❌ Ollama não está acessível")
             OllamaService.print_connection_error(erro)
             sys.exit(1)
-
         print("✅ Ollama conectado!")
 
         # Cria chain RAG
@@ -46,7 +45,10 @@ class RAGService:
 
     def _create_qa_chain(self, database):
         """Cria a cadeia de perguntas e respostas"""
-        retriever = database.as_retriever(search_kwargs={"k": Settings.RETRIEVAL_K})
+        if hasattr(database, "as_retriever"):
+            retriever = database.as_retriever(search_kwargs={"k": Settings.RETRIEVAL_K})
+        else:
+            raise RuntimeError("Vector store não suporta 'as_retriever'.")
 
         # Template de prompt otimizado
         prompt_template = """Use o contexto fornecido para responder à pergunta de forma precisa e específica.
@@ -81,13 +83,24 @@ Resposta:"""
 
         print("✅ Sistema RAG inicializado com sucesso!")
 
+    def rebuild_chain(self) -> None:
+        """Reconstrói a cadeia RAG usando a base atual do DocumentService."""
+        if not self.document_service or not self.document_service.database:
+            print("⚠️ Não há base carregada para reconstruir a chain.")
+            return
+        self._create_qa_chain(self.document_service.database)
+
     def answer_question(self, pergunta: str) -> Optional[str]:
         """Responde uma pergunta usando o sistema RAG"""
         # Tenta buscar no cache primeiro
         resposta_cache = self.cache.get_cached_response(pergunta)
         if resposta_cache:
             print("⚡ Resposta do cache!")
-            return resposta_cache
+            # Se vier no formato {"resposta": "..."}, retorne apenas o texto
+            if isinstance(resposta_cache, dict) and "resposta" in resposta_cache:
+                return str(resposta_cache["resposta"]) if resposta_cache["resposta"] is not None else None
+            # Caso legacy, já seja string
+            return str(resposta_cache)
 
         try:
             print("🔍 Buscando resposta...")
@@ -99,8 +112,9 @@ Resposta:"""
                 OllamaService.print_connection_error(erro)
                 return None
 
-            # Faz a consulta
-            resposta = self.qa_chain.run(pergunta)
+            # Faz a consulta (API nova do LangChain)
+            out = self.qa_chain.invoke({"query": pergunta})
+            resposta = out["result"] if isinstance(out, dict) and "result" in out else str(out)
 
             # Salva no cache
             self.cache.save_response(pergunta, resposta)

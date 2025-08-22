@@ -8,6 +8,7 @@ __pycache__/
 
 # RAG Project specific
 faissDB/
+qdrantDB/
 *.pdf
 *.json
 cache_respostas.json
