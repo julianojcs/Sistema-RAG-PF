@@ -167,6 +167,15 @@ python -c "from src.services.ollama_service import OllamaService; print('Ollama 
 
 # Exportar chunks para análise
 python -c "from src.pf_rag.export_jsonl import export_chunks_jsonl; export_chunks_jsonl('faissDB/chunks_export.jsonl')"
+
+# Inspecionar banco Qdrant (estrutura + conteúdo)
+python show_points.py
+
+# Inspecionar apenas estrutura do banco
+python show_points.py --mode structure
+
+# Ver detalhes de 5 pontos específicos
+python show_points.py --mode details --limit 5
 ```
 
 ### 🌍 **Acesso à Interface Web**
