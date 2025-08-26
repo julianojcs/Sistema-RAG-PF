@@ -60,10 +60,7 @@ class Indexer:
                     return "Parágrafo único"
                 return f"Parágrafo {r}" if r else "Parágrafo"
             if nivel == "alinea":
-                rr = r
-                if rr and not rr.endswith(")"):
-                    rr = rr + ")"
-                return f"Alínea {rr}" if rr else "Alínea"
+                return f"Alínea {r}" if r else "Alínea"
             nome = mapa.get(nivel, nivel.capitalize())
             if nivel == "artigo":
                 return f"{nome} {r}" if r else nome

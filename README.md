@@ -56,27 +56,279 @@ ollama pull nomic-embed-text
 ollama pull llama3.2
 ```
 
-## 🎯 Como Usar
+## 🎯 Como Usar o Sistema
 
-### Interface Web (Recomendado)
+### 📋 **Pré-requisitos**
 1. **Adicione documentos PDF** na pasta `SGP/`
 2. **Inicie o Ollama**: `ollama serve`
-3. **Execute a interface web**: `python -m streamlit run web/app.py`
-4. **Acesse**: http://localhost:8501
-5. **Upload PDFs** pela interface e **faça perguntas**
+3. **Instale dependências**: `pip install -r requirements.txt`
 
-### Interface CLI (Alternativo)
-1. **Adicione documentos PDF** na pasta `SGP/`
-2. **Inicie o Ollama**: `ollama serve`
-3. **Execute o sistema**: `python main.py`
-4. **Faça suas perguntas** sobre legislação da PF
+### 🖥️ **Versão CLI (Linha de Comando)**
 
-### Interface Web (opcional)
-1. Instale dependências: `pip install -r requirements.txt`
-2. Rode a UI: `streamlit run web/app.py`
-3. Abra o navegador no endereço exibido pelo Streamlit
+#### Execução Básica
+```bash
+# Execução padrão com interface CLI
+python main.py
+```
+
+#### Comandos Avançados
+```bash
+# Executar com backend Qdrant (recomendado)
+PF_RAG_VECTOR_DB=qdrant python main.py
+
+# Executar com FAISS (compatibilidade)
+PF_RAG_VECTOR_DB=faiss python main.py
+
+# Modo verbose para debug
+PF_RAG_VERBOSE=true python main.py
+
+# Forçar reconstrução da base
+rm -rf faissDB/ qdrantDB/ && python main.py
+```
+
+#### Processamento Manual via CLI
+```bash
+# Indexação manual dos documentos
+python -c "from src.pf_rag.cli import ingest_index; ingest_index()"
+
+# Análise de calibração dos chunks
+python -c "from src.pf_rag.calibrate import analyze_folder, write_markdown_report; analyze_folder('SGP'); write_markdown_report()"
+
+# Export de chunks para auditoria
+python -c "from src.pf_rag.export_jsonl import export_chunks_jsonl; export_chunks_jsonl()"
+```
+
+### 🌐 **Versão Web (Interface Streamlit)**
+
+#### Execução da Interface Web
+```bash
+# Iniciar servidor web (padrão na porta 8501)
+python -m streamlit run web/app.py
+
+# Especificar porta personalizada
+python -m streamlit run web/app.py --server.port 8080
+
+# Acessar de outras máquinas na rede
+python -m streamlit run web/app.py --server.address 0.0.0.0
+
+# Alternativa se streamlit estiver no PATH
+streamlit run web/app.py
+```
+
+**🔧 Problema no Windows?** Se `streamlit` não for encontrado, use sempre `python -m streamlit`
+
+#### Funcionalidades da Interface Web
+- ✅ **Upload de PDFs**: Drag-and-drop para adicionar documentos
+- ✅ **Reindexação**: Interface visual com barra de progresso
+- ✅ **Preview de Retrieval**: Visualização dos chunks encontrados
+- ✅ **Breadcrumbs Hierárquicos**: Navegação por estrutura normativa
+- ✅ **Cache Visual**: Indicadores de cache hits/misses
+- ✅ **Configurações**: Ajuste de parâmetros via interface
+
+### ⚙️ **Configurações Avançadas via Variáveis de Ambiente**
+
+```bash
+# Backend do banco vetorial (qdrant recomendado)
+export PF_RAG_VECTOR_DB=qdrant        # ou faiss
+
+# Habilitar extração com Docling (layout-aware)
+export PF_RAG_USE_DOCLING=true
+
+# Configurar OCR para PDFs escaneados
+export PF_RAG_OCR_ENABLED=true
+export PF_RAG_OCR_LANG=por
+
+# Ajustar tamanho dos chunks
+export PF_RAG_TOKEN_MIN=400
+export PF_RAG_TOKEN_MAX=1200
+
+# Modo offline (sem downloads de modelos)
+export PF_RAG_OFFLINE=true
+
+# Habilitar busca híbrida BM25
+export PF_RAG_BM25_ENABLED=true
+
+# Export automático de chunks para auditoria
+export PF_RAG_EXPORT_JSONL=true
+```
+
+### 🔧 **Comandos de Manutenção**
+
+```bash
+# Limpar cache e forçar reconstrução
+rm -rf faissDB/ qdrantDB/
+python main.py
+
+# Verificar status da base de dados
+python -c "from src.utils.file_utils import FileUtils; print('Mudanças detectadas:', FileUtils.check_folder_changes()[0])"
+
+# Testar conectividade Ollama
+python -c "from src.services.ollama_service import OllamaService; print('Ollama OK:', OllamaService.check_connection()[0])"
+
+# Exportar chunks para análise
+python -c "from src.pf_rag.export_jsonl import export_chunks_jsonl; export_chunks_jsonl('faissDB/chunks_export.jsonl')"
+```
+
+### 🌍 **Acesso à Interface Web**
+
+Após executar `python -m streamlit run web/app.py`, acesse:
+- **Local**: http://localhost:8501
+- **Rede**: http://[IP_DA_MAQUINA]:8501
+- **Porta customizada**: http://localhost:[PORTA]
 
 ## 📊 Performance
+
+| Tipo de Consulta | Tempo Médio | Cache Hit |
+|------------------|-------------|-----------|
+| Pergunta nova | 2-3 segundos | ❌ |
+| Pergunta repetida | 0.01 segundos | ✅ |
+| Startup | 1-2 segundos | - |
+
+## 📁 Estrutura do Projeto
+
+```
+RAG/
+├── main.py                     # 🎯 CLI - Ponto de entrada linha de comando
+├── requirements.txt            # 📦 Dependências Python completas
+├── install.sh                 # 🐧 Script instalação Linux/Mac
+├── install.bat                # 🪟 Script instalação Windows
+├── docs/                      # 📚 Documentação completa
+│   ├── README.md              # 📁 Índice da documentação
+│   ├── CHANGELOG.md           # 📋 Histórico detalhado de mudanças
+│   ├── ARCHITECTURE.md        # 🏗️ Arquitetura e decisões técnicas
+│   └── DOCUMENTATION_GUIDE.md # 📝 Guia de documentação
+├── web/                       # 🌐 Interface Web Streamlit
+│   └── app.py                 # 🖥️ Aplicação web principal
+├── src/                       # 📂 Código fonte modular
+│   ├── config/
+│   │   └── settings.py        # ⚙️ Configurações centralizadas
+│   ├── core/
+│   │   └── rag_service.py     # 🧠 Lógica principal RAG
+│   ├── services/
+│   │   ├── document_service.py # 📄 Processamento de documentos
+│   │   └── ollama_service.py   # 🔌 Conectividade Ollama
+│   ├── utils/
+│   │   ├── cache_utils.py     # ⚡ Sistema de cache otimizado
+│   │   ├── file_utils.py      # 📁 Operações com arquivos
+│   │   └── ingest_manifest.py # 📊 Manifesto para rebuild incremental
+│   ├── pf_rag/                # 🛡️ Pipeline PF-específico
+│   │   ├── cli.py             # 💻 Interface linha de comando
+│   │   ├── io_pdf.py          # 📄 Extração PDF (Docling + OCR)
+│   │   ├── parse_norma.py     # 📜 Parsing hierárquico normativo
+│   │   ├── chunker.py         # ✂️ Chunking layout-aware
+│   │   ├── search.py          # 🔍 Busca híbrida (dense + BM25)
+│   │   ├── embed_index.py     # 🧮 Indexação e embeddings
+│   │   ├── export_jsonl.py    # 📤 Export para auditoria
+│   │   ├── metadata_pf.py     # 🏷️ Metadados específicos PF
+│   │   ├── normalize.py       # 🧹 Normalização de texto
+│   │   ├── regexes.py         # 🔤 Expressões regulares normativas
+│   │   ├── types.py           # 📝 Tipos e estruturas de dados
+│   │   ├── calibrate.py       # 📏 Calibração e análise
+│   │   └── eval.py            # 📊 Avaliação de performance
+│   └── vector_backends/       # 🗃️ Backends de banco vetorial
+│       └── qdrant_backend.py  # 🚀 Cliente Qdrant embedded
+├── tests/                     # 🧪 Testes automatizados
+│   ├── conftest.py           # ⚙️ Configuração pytest
+│   ├── test_parse_chunk.py   # 🧪 Testes parsing/chunking
+│   └── test_regexes.py       # 🔤 Testes expressões regulares
+├── SGP/                       # 📚 Documentos PDF fonte
+│   ├── documento1.pdf         # 📄 PDFs normativos da PF
+│   └── documento2.pdf         # 📄 Legislações e instruções
+├── faissDB/                   # 🗃️ Base FAISS (legado/compatibilidade)
+│   ├── index.faiss           # 🔍 Índice busca semântica FAISS
+│   ├── index.pkl             # 📊 Metadados da base FAISS
+│   ├── sgp_hash.json         # 🔐 Hash detecção mudanças
+│   ├── cache_respostas.json  # ⚡ Cache respostas persistente
+│   └── chunks.jsonl          # 📋 Export chunks (se habilitado)
+└── qdrantDB/                  # 🚀 Base Qdrant (recomendado)
+    └── collection/            # 📁 Coleções Qdrant embedded
+```
+
+### 🎯 **Componentes Principais**
+
+#### 🌐 **Interface Web** (`web/app.py`)
+- Upload drag-and-drop de PDFs
+- Reindexação com progress visual
+- Preview de retrieval com breadcrumbs
+- Dashboard de métricas em tempo real
+
+#### 🛡️ **Pipeline PF-Específico** (`src/pf_rag/`)
+- Parsing hierárquico de normas (Art., §, Incisos)
+- Chunking que preserva estrutura e tabelas
+- Busca híbrida (embeddings + BM25)
+- Metadados específicos para legislação PF
+
+#### 🚀 **Backend Qdrant** (`src/vector_backends/`)
+- Alternativa moderna ao FAISS
+- Operações granulares (delete por arquivo)
+- Embedded mode sem servidor externo
+- Clear collection para rebuilds limpos
+
+## 🔧 Configurações Avançadas
+
+### Backend de Banco Vetorial
+```bash
+# Qdrant (recomendado) - moderno e eficiente
+export PF_RAG_VECTOR_DB=qdrant
+
+# FAISS (compatibilidade) - para sistemas legados
+export PF_RAG_VECTOR_DB=faiss
+```
+
+### Modelos de LLM Alternativos
+```bash
+# Em src/config/settings.py ou via variável:
+export LLM_MODEL="mistral:7b"        # Mais rápido que llama3.2
+export LLM_MODEL="qwen2:7b"          # Alternativa rápida
+export LLM_MODEL="llama3.2:latest"   # Padrão (mais preciso)
+```
+
+### Parâmetros de Chunking PF-Específico
+```bash
+# Tamanho dos chunks (em tokens)
+export PF_RAG_TOKEN_MIN=400          # Mínimo por chunk
+export PF_RAG_TOKEN_MAX=1200         # Máximo por chunk
+
+# Ajustar retrieval (quantos chunks buscar)
+export RETRIEVAL_K=4                 # Mais rápido (menos chunks)
+export RETRIEVAL_K=8                 # Mais preciso (mais chunks)
+```
+
+### Extração Avançada de PDF
+```bash
+# Docling (recomendado) - layout-aware com tabelas
+export PF_RAG_USE_DOCLING=true
+
+# OCR para PDFs escaneados
+export PF_RAG_OCR_ENABLED=true
+export PF_RAG_OCR_LANG=por
+
+# Busca híbrida com BM25
+export PF_RAG_BM25_ENABLED=true
+```
+
+### Embeddings e Performance
+```bash
+# Backend de embeddings
+export PF_RAG_EMBED_BACKEND=ollama   # Padrão com Ollama
+export PF_RAG_EMBED_BACKEND=sbert    # Sentence-BERT local
+
+# Batch size para indexação
+export PF_RAG_EMBED_BATCH=64
+
+# Modo offline (sem downloads)
+export PF_RAG_OFFLINE=true
+```
+
+### Auditoria e Export
+```bash
+# Export automático de chunks para análise
+export PF_RAG_EXPORT_JSONL=true
+export PF_RAG_CHUNKS_JSONL=faissDB/chunks_audit.jsonl
+
+# Verbose para debugging
+export PF_RAG_VERBOSE=true
+```
 
 | Tipo de Consulta | Tempo Médio | Cache Hit |
 |------------------|-------------|-----------|
@@ -148,6 +400,47 @@ CHUNK_OVERLAP = 100            # Menos overlap = mais velocidade
 
 ## 🐛 Solução de Problemas
 
+### Erro: "Storage folder qdrantDB is already accessed by another instance"
+```bash
+# Causa: Múltiplas instâncias do sistema rodando simultaneamente
+
+# Solução 1: Parar todas as instâncias
+# - Feche todos os terminais/Streamlit do RAG
+# - Aguarde 10 segundos e tente novamente
+
+# Solução 2: Forçar limpeza do banco Qdrant
+rm -rf qdrantDB/
+python main.py
+
+# Solução 3: Usar FAISS temporariamente
+PF_RAG_VECTOR_DB=faiss python main.py
+
+# Limpeza de pastas antigas (se houver qdrantDB_1234567890)
+rm -rf qdrantDB_*
+```
+
+### Problema: Múltiplas pastas qdrantDB_timestamp
+```bash
+# O sistema pode criar pastas com timestamp em conflitos
+# Exemplo: qdrantDB_1756149969, qdrantDB_1756150001
+
+# Solução automática: O sistema agora limpa automaticamente
+# Solução manual: Remover pastas antigas
+find . -name "qdrantDB_*" -type d -exec rm -rf {} \;
+
+# Manter apenas a pasta principal
+ls qdrantDB/  # Esta deve ser a única pasta
+```
+
+### Erro: "streamlit command not found"
+```bash
+# No Windows, usar sempre:
+python -m streamlit run web/app.py
+
+# Ou adicionar ao PATH:
+# C:\Users\[usuario]\AppData\Roaming\Python\Python313\Scripts
+```
+
 ### Erro: "Ollama não encontrado"
 ```bash
 # Verificar se Ollama está rodando
@@ -181,10 +474,19 @@ pip install pypdf
 - **Detecção de mudanças** por hash MD5
 - **Feedback em tempo real** de progresso
 
-## � Histórico de Versões
+## 📈 Histórico de Versões
 
-### 🆕 v2.0.0 - Arquitetura Modular (Atual)
-- ✅ **Sistema modularizado** em 7 componentes especializados
+### 🆕 v3.0.0 - Sistema Completo com Interface Web (Atual)
+- ✅ **Interface Web Streamlit** com upload drag-and-drop
+- ✅ **Backend Qdrant** integrado como alternativa ao FAISS
+- ✅ **Pipeline PF-Específico** com parsing hierárquico de normas
+- ✅ **Docling Integration** para extração layout-aware de PDFs
+- ✅ **Busca Híbrida** (embeddings + BM25)
+- ✅ **Export de Chunks** para auditoria
+- ✅ **Configuração via Environment Variables**
+
+### v2.0.0 - Arquitetura Modular
+- ✅ **Sistema modularizado** em componentes especializados
 - ✅ **main.py otimizado** de 400+ para 80 linhas
 - ✅ **Separação de responsabilidades** clara
 - ✅ **Manutenibilidade** e testabilidade aprimoradas
@@ -203,21 +505,23 @@ pip install pypdf
 
 ## 🔮 Roadmap Futuro
 
-### v2.1.0 - Interface Web
-- [ ] Streamlit/Gradio UI
-- [ ] Upload de arquivos via web
-- [ ] Dashboard de métricas em tempo real
+### v3.1.0 - API REST
+- [ ] **FastAPI backend** para integração com sistemas externos
+- [ ] **Endpoints RESTful** para consultas programáticas
+- [ ] **Documentação OpenAPI/Swagger** automática
+- [ ] **Autenticação e autorização** baseada em tokens
 
-### v2.2.0 - API REST
-- [ ] FastAPI backend
-- [ ] Endpoints RESTful para consultas
-- [ ] Documentação OpenAPI/Swagger
+### v3.2.0 - IA Avançada
+- [ ] **Reranking de resultados** com modelos cross-encoder
+- [ ] **Streaming de respostas** em tempo real
+- [ ] **Suporte multilíngue** (português, inglês, espanhol)
+- [ ] **Análise de sentimento** em documentos
 
-### v3.0.0 - IA Avançada
-- [ ] Busca híbrida (semântica + keyword)
-- [ ] Reranking de resultados
-- [ ] Streaming de respostas
-- [ ] Suporte multilíngue
+### v4.0.0 - Recursos Empresariais
+- [ ] **Dashboard Analytics** com métricas detalhadas
+- [ ] **Auditoria completa** de consultas e respostas
+- [ ] **Integração LDAP/AD** para autenticação corporativa
+- [ ] **Multi-tenancy** para múltiplas organizações
 
 ## 📞 Suporte
 

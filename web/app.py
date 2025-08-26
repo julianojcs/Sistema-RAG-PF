@@ -1,6 +1,13 @@
 import os
 import sys
 import json
+import warnings
+import logging
+
+# Suprimir warnings de PDF com cores inválidas
+warnings.filterwarnings('ignore', message='Cannot set gray non-stroke color')
+warnings.filterwarnings('ignore', category=UserWarning)
+logging.getLogger('pdfminer').setLevel(logging.ERROR)
 
 import streamlit as st
 
@@ -27,6 +34,17 @@ from src.utils.ingest_manifest import diff_current_vs_manifest, save_manifest
 
 st.set_page_config(page_title="Sistema RAG-PF", page_icon="🛡️", layout="wide")
 
+# Utility function para extração de PDF sem warnings
+def safe_extract_text(pdf_path: str):
+    """Extrai texto de PDF suprimindo warnings de cores inválidas"""
+    import io
+    import contextlib
+
+    with contextlib.redirect_stderr(io.StringIO()):
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            return extract_text(pdf_path)
+
 # Cached singletons
 @st.cache_resource(show_spinner=False)
 def get_service() -> RAGService:
@@ -38,35 +56,54 @@ def get_service_with_progress():
         # Check if database needs to be built
         from src.utils.file_utils import FileUtils
         import os
-        
+
         mudancas_detectadas, _ = FileUtils.check_folder_changes()
         needs_build = mudancas_detectadas or not os.path.exists(Settings.FAISS_DB_PATH)
-        
+
         if needs_build:
             st.info("🔄 Base de dados precisa ser criada/atualizada. Processando...")
-            
+
             # Progress bar
             progress_bar = st.progress(0.0)
             status_text = st.empty()
-            
+
             def progress_callback(fraction: float, message: str):
                 progress_bar.progress(fraction)
                 status_text.text(message)
-            
-            # Create service with progress
-            from src.core.rag_service import RAGService
-            service = RAGService(progress_callback=progress_callback)
-            
-            progress_bar.progress(1.0)
-            status_text.text("✅ Inicialização concluída!")
-            st.session_state['service_initialized'] = service
-            
-            # Clear progress elements
-            progress_bar.empty()
-            status_text.empty()
+
+            # Create service with progress and error handling
+            try:
+                from src.core.rag_service import RAGService
+                service = RAGService(progress_callback=progress_callback)
+
+                progress_bar.progress(1.0)
+                status_text.text("✅ Inicialização concluída!")
+                st.session_state['service_initialized'] = service
+
+                # Clear progress elements
+                progress_bar.empty()
+                status_text.empty()
+
+            except Exception as e:
+                error_msg = str(e)
+                if "already accessed by another instance" in error_msg:
+                    st.error("❌ **Erro**: Outra instância do sistema está rodando. Por favor:")
+                    st.markdown("""
+                    1. **Feche outras instâncias** do Streamlit ou terminal com RAG
+                    2. **Aguarde 10 segundos** e recarregue a página (F5)
+                    3. Se persistir, **reinicie o navegador**
+                    """)
+                    st.info("💡 Este erro ocorre quando múltiplas instâncias tentam acessar o mesmo banco Qdrant")
+                else:
+                    st.error(f"❌ Erro na inicialização: {error_msg}")
+
+                # Clear progress elements
+                progress_bar.empty()
+                status_text.empty()
+                st.stop()
         else:
             st.session_state['service_initialized'] = get_service()
-    
+
     return st.session_state['service_initialized']
 
 st.title("🛡️ Sistema RAG-PF — Interface Web")
@@ -93,36 +130,70 @@ def format_breadcrumb(md: dict) -> str:
         r = (rotulo or "").strip()
         # Remover símbolos duplicados
         r = r.replace("§", "").strip()
+
         # Parágrafo único
         if nivel == "paragrafo":
             low = r.lower().replace("ú", "u").strip()
             if "unico" in low or low == "unico":
                 return "Parágrafo único"
             return f"Parágrafo {r}" if r else "Parágrafo"
-        # Alínea com fechamento ")"
+
+        # Alínea sem fechamento automático
         if nivel == "alinea":
-            rr = r
-            if rr and not rr.endswith(")"):
-                rr = rr + ")"
-            return f"Alínea {rr}" if rr else "Alínea"
-        nome = mapa.get(nivel, nivel.capitalize())
+            return f"Alínea {r}" if r else "Alínea"
+
+        # Artigo - verificar se já contém "Art."
         if nivel == "artigo":
+            nome = mapa.get(nivel, nivel.capitalize())
+            # Se o rótulo já contém "Art.", não duplicar
+            if r and r.startswith("Art."):
+                return r
             return f"{nome} {r}" if r else nome
+
+        nome = mapa.get(nivel, nivel.capitalize())
         return f"{nome} {r}" if r else nome
 
     if not isinstance(md, dict):
         return md or "Trecho"
+
     # Preferir breadcrumb pronto se parecer legível
     bc = md.get("breadcrumb")
     if isinstance(bc, str) and any(tok in bc for tok in ["Capítulo", "Seção", "Subseção", "Art.", "Parágrafo", "Inciso", "Alínea", "Item", "Anexo"]):
         return bc
+
+    # Construir caminho hierárquico
     caminho = md.get("caminho_hierarquico") or []
     if isinstance(caminho, list):
-        path = list(caminho) + [{"nivel": md.get("nivel"), "rotulo": md.get("rotulo")}]
-        labels = [fmt_label(n.get("nivel", ""), n.get("rotulo", "")) for n in path if isinstance(n, dict)]
-        labels = [l for l in labels if l]
+        # Criar uma cópia do caminho
+        path = list(caminho)
+
+        # Adicionar elemento atual apenas se não estiver já presente
+        elemento_atual = {"nivel": md.get("nivel"), "rotulo": md.get("rotulo")}
+        nivel_atual = elemento_atual.get("nivel")
+        rotulo_atual = elemento_atual.get("rotulo")
+
+        # Verificar se o último elemento do caminho é igual ao atual
+        if path and isinstance(path[-1], dict):
+            ultimo = path[-1]
+            if (ultimo.get("nivel") != nivel_atual or
+                ultimo.get("rotulo") != rotulo_atual):
+                path.append(elemento_atual)
+        else:
+            # Se não há caminho ou último elemento não é dict, adicionar
+            if nivel_atual or rotulo_atual:
+                path.append(elemento_atual)
+
+        # Gerar labels sem duplicações
+        labels = []
+        for n in path:
+            if isinstance(n, dict):
+                label = fmt_label(n.get("nivel", ""), n.get("rotulo", ""))
+                if label and label not in labels:  # Evitar duplicações exatas
+                    labels.append(label)
+
         if labels:
             return " > ".join(labels)
+
     # Fallbacks
     return md.get("rotulo") or "Trecho"
 
@@ -216,12 +287,16 @@ if reindex:
                 total_files = max(1, len(pdfs))
                 for idx, pdf in enumerate(pdfs, start=1):
                     status.markdown(f"Processando `{os.path.basename(pdf)}` ({idx}/{len(pdfs)})...")
-                    raw, pages, ocr = extract_text(pdf)
-                    text, pages2 = clean_text(raw, pages)
-                    nodes, heading = detect_structure(text)
-                    meta = meta_extract(text, heading, os.path.basename(pdf))
-                    chunks = build_chunks(nodes, text, meta, pdf, [p.index for p in pages2])
-                    all_chunks.extend(chunks)
+                    try:
+                        raw, pages, ocr = safe_extract_text(pdf)
+                        text, pages2 = clean_text(raw, pages)
+                        nodes, heading = detect_structure(text)
+                        meta = meta_extract(text, heading, os.path.basename(pdf))
+                        chunks = build_chunks(nodes, text, meta, pdf, [p.index for p in pages2])
+                        all_chunks.extend(chunks)
+                    except Exception as e:
+                        st.warning(f"Erro ao processar {os.path.basename(pdf)}: {e}")
+                        continue
                     pbar.progress(min(0.2, idx/total_files*0.2), text=f"Chunks acumulados: {len(all_chunks)}")
 
                 def cb(frac: float, msg: str):
@@ -278,12 +353,16 @@ if reindex:
                 total_files = max(1, len(added))
                 for idx, pdf in enumerate(added, start=1):
                     status.markdown(f"Processando `{os.path.basename(pdf)}` ({idx}/{len(added)})...")
-                    raw, pages, ocr = extract_text(pdf)
-                    text, pages2 = clean_text(raw, pages)
-                    nodes, heading = detect_structure(text)
-                    meta = meta_extract(text, heading, os.path.basename(pdf))
-                    chunks = build_chunks(nodes, text, meta, pdf, [p.index for p in pages2])
-                    all_new_chunks.extend(chunks)
+                    try:
+                        raw, pages, ocr = safe_extract_text(pdf)
+                        text, pages2 = clean_text(raw, pages)
+                        nodes, heading = detect_structure(text)
+                        meta = meta_extract(text, heading, os.path.basename(pdf))
+                        chunks = build_chunks(nodes, text, meta, pdf, [p.index for p in pages2])
+                        all_new_chunks.extend(chunks)
+                    except Exception as e:
+                        st.warning(f"Erro ao processar {os.path.basename(pdf)}: {e}")
+                        continue
                     pbar.progress(min(0.2, idx/total_files*0.2), text=f"Novos chunks: {len(all_new_chunks)}")
 
                 # Carregar base existente (se houver) e apenas adicionar textos/metadados

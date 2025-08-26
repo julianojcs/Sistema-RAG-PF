@@ -163,15 +163,57 @@ Este documento define as diretrizes para manter a documentação do projeto orga
    - CHANGELOG.md: Desenvolvedores e usuários avançados
    - ARCHITECTURE.md: Equipe técnica
 
-3. **Linguagem Apropriada**
+3. **Comandos de Execução Atualizados**
+   - Mantenha comandos CLI e Web sincronizados
+   - Documente variáveis de ambiente importantes
+   - Inclua exemplos práticos de uso
+
+4. **Linguagem Apropriada**
    - README.md: Linguagem acessível, foco em benefícios
    - CHANGELOG.md: Linguagem técnica mas clara
    - ARCHITECTURE.md: Linguagem técnica detalhada
 
-4. **Manutenção Regular**
+5. **Manutenção Regular**
    - Atualizar durante o desenvolvimento, não apenas no final
    - Revisar documentação a cada release
    - Remover informações obsoletas
+
+### 🎯 **Comandos de Execução (Template para Documentação)**
+
+Ao documentar novos comandos, use este template:
+
+```markdown
+### 🖥️ **Modo CLI**
+```bash
+# Execução básica
+python main.py
+
+# Com configurações específicas
+PF_RAG_VECTOR_DB=qdrant python main.py
+```
+
+### 🌐 **Modo Web**
+```bash
+# Interface web básica
+streamlit run web/app.py
+
+# Com porta customizada
+streamlit run web/app.py --server.port 8080
+```
+
+### ⚙️ **Configurações Avançadas**
+```bash
+# Variáveis de ambiente importantes
+export PF_RAG_VECTOR_DB=qdrant
+export PF_RAG_VERBOSE=true
+```
+```
+
+**Sempre incluir**:
+- Comandos básicos e avançados
+- Variáveis de ambiente relevantes
+- URLs de acesso para interface web
+- Comandos de manutenção/debug
 
 ### ❌ Evitar
 

@@ -91,12 +91,12 @@ class DocumentService:
             import time
             all_chunks = []
             total_files = len(arquivos_pdf)
-            
+
             for idx, pdf in enumerate(arquivos_pdf):
                 if progress_callback:
                     file_progress = idx / total_files * 0.6  # 60% para processamento PDFs
                     progress_callback(file_progress, f"Processando {os.path.basename(pdf)} ({idx+1}/{total_files})")
-                
+
                 t0 = time.time()
                 raw, pages, ocr = pf_extract_text(pdf)
                 text, pages2 = pf_clean_text(raw, pages)
@@ -117,53 +117,85 @@ class DocumentService:
             if Settings.VECTOR_DB_BACKEND.startswith("qdrant"):
                 if progress_callback:
                     progress_callback(0.65, f"Preparando indexação Qdrant ({len(all_chunks)} chunks)...")
-                
+
                 print(f"🧠 Criando embeddings e base Qdrant (chunks={len(all_chunks)})...")
                 qindex = QdrantIndexer(backend=Settings.EMBEDDING_BACKEND)
-                
-                # Clear any existing storage to avoid conflicts
-                try:
-                    qindex.clear_collection()
-                except Exception:
-                    pass
-                    
+
+                # Clear any existing storage to avoid conflicts (with retries)
+                max_clear_attempts = 3
+                for attempt in range(max_clear_attempts):
+                    try:
+                        qindex.clear_collection()
+                        break
+                    except Exception as e:
+                        if "already accessed by another instance" in str(e):
+                            print(f"⚠️ Tentativa {attempt + 1}: Aguardando liberação do Qdrant...")
+                            import time
+                            time.sleep(2 + attempt)
+                            # Force clear storage on last attempt
+                            if attempt == max_clear_attempts - 1:
+                                qindex._clear_storage_lock()
+                        else:
+                            break
+
                 # Also try to remove the storage folder if it exists and is locked
                 import shutil
                 try:
                     if os.path.exists(Settings.QDRANT_PATH):
                         shutil.rmtree(Settings.QDRANT_PATH, ignore_errors=True)
+                        import time
+                        time.sleep(0.5)  # Brief pause for filesystem
                 except Exception:
                     pass
-                
+
                 def qdrant_callback(frac: float, msg: str):
                     # Map to 65%-95% range
                     val = 0.65 + (frac * 0.3)
                     if progress_callback:
                         progress_callback(val, f"Qdrant: {msg}")
-                    
+
                 t0 = time.time()
-                db = qindex.build_qdrant(all_chunks, progress_callback=qdrant_callback)
+
+                # Build with retry logic for instance conflicts
+                max_build_attempts = 2
+                db = None
+                for attempt in range(max_build_attempts):
+                    try:
+                        db = qindex.build_qdrant(all_chunks, progress_callback=qdrant_callback)
+                        break
+                    except Exception as e:
+                        if "already accessed by another instance" in str(e) and attempt < max_build_attempts - 1:
+                            print(f"⚠️ Conflito de instância Qdrant, tentando novamente...")
+                            qindex._clear_storage_lock()
+                            import time
+                            time.sleep(2)
+                        else:
+                            raise e
+
+                if db is None:
+                    raise RuntimeError("Falha ao criar base Qdrant após múltiplas tentativas")
+
                 print(f"⏱️ Tempo embeddings+index: {time.time()-t0:.2f}s")
                 # Qdrant embutido persiste via path automaticamente
             else:
                 if progress_callback:
                     progress_callback(0.65, f"Preparando indexação FAISS ({len(all_chunks)} chunks)...")
-                
+
                 indexer = PFIndexer(backend=Settings.EMBEDDING_BACKEND)
                 print(f"🧠 Criando embeddings hierárquicos e base FAISS (chunks={len(all_chunks)})...")
-                
+
                 def faiss_callback(frac: float, msg: str):
                     # Map to 65%-95% range
                     val = 0.65 + (frac * 0.3)
                     if progress_callback:
                         progress_callback(val, f"FAISS: {msg}")
-                
+
                 t0 = time.time()
                 db = indexer.build_faiss(all_chunks, progress_callback=faiss_callback)
                 print(f"⏱️ Tempo embeddings+index: {time.time()-t0:.2f}s")
                 print("💾 Salvando base de dados...")
                 indexer.save_faiss(db, Settings.FAISS_DB_PATH)
-                
+
             # Export JSONL para auditoria
             if Settings.EXPORT_CHUNKS_JSONL:
                 if progress_callback:
@@ -173,7 +205,7 @@ class DocumentService:
                     print("📝", msg)
                 except Exception as e:
                     print(f"⚠️ Falha ao exportar JSONL: {e}")
-                    
+
             if progress_callback:
                 progress_callback(1.0, "✅ Base de dados criada com sucesso!")
             print("✅ Base de dados criada (PF RAG)!")

@@ -1,7 +1,17 @@
 from __future__ import annotations
 import os
+import warnings
+import logging
 from typing import List, Tuple, Dict, Any
 from .types import PDFPage
+
+# Suprimir warnings específicos do pdfminer sobre cores inválidas
+warnings.filterwarnings('ignore', message='Cannot set gray non-stroke color')
+warnings.filterwarnings('ignore', message='Invalid float value')
+
+# Configurar logging do pdfminer para ERROR apenas (suprime warnings)
+logging.getLogger('pdfminer').setLevel(logging.ERROR)
+
 from pdfminer.high_level import extract_text as pdfminer_extract_text  # type: ignore
 
 try:
@@ -117,6 +127,33 @@ def _extract_with_docling(path: str) -> Tuple[str, List[PDFPage], bool, Dict[str
     return full_text, pages, False, extras
 
 
+def _safe_pdfminer_extract(path: str) -> str:
+    """
+    Wrapper robusto para pdfminer que captura warnings sobre cores inválidas.
+    """
+    import io
+    import sys
+    import contextlib
+
+    # Capturar stderr temporariamente para suprimir warnings
+    old_stderr = sys.stderr
+
+    try:
+        with contextlib.redirect_stderr(io.StringIO()):
+            # Suprimir warnings temporariamente
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                text = pdfminer_extract_text(path) or ""
+                return text
+    except Exception as e:
+        # Log apenas erros críticos, não warnings de cor
+        if "gray non-stroke color" not in str(e):
+            print(f"Erro na extração PDF: {e}")
+        return ""
+    finally:
+        sys.stderr = old_stderr
+
+
 def extract_text(path: str) -> Tuple[str, List[PDFPage], bool]:
     """
     Extrai o texto do PDF com preferência por Docling (layout-aware).
@@ -140,7 +177,7 @@ def extract_text(path: str) -> Tuple[str, List[PDFPage], bool]:
             pass
 
     try:
-        text = pdfminer_extract_text(path) or ""
+        text = _safe_pdfminer_extract(path)
     except Exception:
         text = ""
 
