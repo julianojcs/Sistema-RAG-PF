@@ -176,6 +176,12 @@ python show_points.py --mode structure
 
 # Ver detalhes de 5 pontos específicos
 python show_points.py --mode details --limit 5
+
+# Ver exemplos com texto completo (sem truncamento)
+python show_points.py --mode examples --full-text
+
+# Buscar chunks específicos com texto completo
+python search_chunks.py --nivel artigo --full-text
 ```
 
 ### 🌍 **Acesso à Interface Web**

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>hierarquisação_rag.md</title>
+    <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+    
+<style>
+/* https://github.com/microsoft/vscode/blob/master/extensions/markdown-language-features/media/markdown.css */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+body {
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+	padding: 0 26px;
+	line-height: var(--vscode-markdown-line-height, 22px);
+	word-wrap: break-word;
+}
+
+html,footer,header{
+	font-family: var(--vscode-markdown-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif);
+	font-size: var(--vscode-markdown-font-size, 14px);
+}
+
+#code-csp-warning {
+	position: fixed;
+	top: 0;
+	right: 0;
+	color: white;
+	margin: 16px;
+	text-align: center;
+	font-size: 12px;
+	font-family: sans-serif;
+	background-color:#444444;
+	cursor: pointer;
+	padding: 6px;
+	box-shadow: 1px 1px 1px rgba(0,0,0,.25);
+}
+
+#code-csp-warning:hover {
+	text-decoration: none;
+	background-color:#007acc;
+	box-shadow: 2px 2px 2px rgba(0,0,0,.25);
+}
+
+body.scrollBeyondLastLine {
+	margin-bottom: calc(100vh - 22px);
+}
+
+body.showEditorSelection .code-line {
+	position: relative;
+}
+
+body.showEditorSelection .code-active-line:before,
+body.showEditorSelection .code-line:hover:before {
+	content: "";
+	display: block;
+	position: absolute;
+	top: 0;
+	left: -12px;
+	height: 100%;
+}
+
+body.showEditorSelection li.code-active-line:before,
+body.showEditorSelection li.code-line:hover:before {
+	left: -30px;
+}
+
+.vscode-light.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.vscode-light.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(0, 0, 0, 0.40);
+}
+
+.vscode-light.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-dark.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.4);
+}
+
+.vscode-dark.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 255, 255, 0.60);
+}
+
+.vscode-dark.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+.vscode-high-contrast.showEditorSelection .code-active-line:before {
+	border-left: 3px solid rgba(255, 160, 0, 0.7);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line:hover:before {
+	border-left: 3px solid rgba(255, 160, 0, 1);
+}
+
+.vscode-high-contrast.showEditorSelection .code-line .code-line:hover:before {
+	border-left: none;
+}
+
+img {
+	max-width: 100%;
+	max-height: 100%;
+}
+
+a {
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+a:focus,
+input:focus,
+select:focus,
+textarea:focus {
+	outline: 1px solid -webkit-focus-ring-color;
+	outline-offset: -1px;
+}
+
+hr {
+	border: 0;
+	height: 2px;
+	border-bottom: 2px solid;
+}
+
+h1 {
+	padding-bottom: 0.3em;
+	line-height: 1.2;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+}
+
+h1, h2, h3 {
+	font-weight: normal;
+}
+
+table {
+	border-collapse: collapse;
+}
+
+table > thead > tr > th {
+	text-align: left;
+	border-bottom: 1px solid;
+}
+
+table > thead > tr > th,
+table > thead > tr > td,
+table > tbody > tr > th,
+table > tbody > tr > td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid;
+}
+
+blockquote {
+	margin: 0 7px 0 5px;
+	padding: 0 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+}
+
+code {
+	font-family: Menlo, Monaco, Consolas, "Droid Sans Mono", "Courier New", monospace, "Droid Sans Fallback";
+	font-size: 1em;
+	line-height: 1.357em;
+}
+
+body.wordWrap pre {
+	white-space: pre-wrap;
+}
+
+pre:not(.hljs),
+pre.hljs code > div {
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	color: var(--vscode-editor-foreground);
+	tab-size: 4;
+}
+
+/** Theming */
+
+.vscode-light pre {
+	background-color: rgba(220, 220, 220, 0.4);
+}
+
+.vscode-dark pre {
+	background-color: rgba(10, 10, 10, 0.4);
+}
+
+.vscode-high-contrast pre {
+	background-color: rgb(0, 0, 0);
+}
+
+.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}
+
+.vscode-light table > thead > tr > th {
+	border-color: rgba(0, 0, 0, 0.69);
+}
+
+.vscode-dark table > thead > tr > th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+.vscode-light h1,
+.vscode-light hr,
+.vscode-light table > tbody > tr + tr > td {
+	border-color: rgba(0, 0, 0, 0.18);
+}
+
+.vscode-dark h1,
+.vscode-dark hr,
+.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+</style>
+
+<style>
+/* Tomorrow Theme */
+/* http://jmblog.github.com/color-themes-for-google-code-highlightjs */
+/* Original theme - https://github.com/chriskempson/tomorrow-theme */
+
+/* Tomorrow Comment */
+.hljs-comment,
+.hljs-quote {
+	color: #8e908c;
+}
+
+/* Tomorrow Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+	color: #c82829;
+}
+
+/* Tomorrow Orange */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+	color: #f5871f;
+}
+
+/* Tomorrow Yellow */
+.hljs-attribute {
+	color: #eab700;
+}
+
+/* Tomorrow Green */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+	color: #718c00;
+}
+
+/* Tomorrow Blue */
+.hljs-title,
+.hljs-section {
+	color: #4271ae;
+}
+
+/* Tomorrow Purple */
+.hljs-keyword,
+.hljs-selector-tag {
+	color: #8959a8;
+}
+
+.hljs {
+	display: block;
+	overflow-x: auto;
+	color: #4d4d4c;
+	padding: 0.5em;
+}
+
+.hljs-emphasis {
+	font-style: italic;
+}
+
+.hljs-strong {
+	font-weight: bold;
+}
+</style>
+
+<style>
+/*
+ * Custom MD PDF CSS
+ */
+html,footer,header{
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+
+ }
+body {
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", "Ubuntu", "Droid Sans", sans-serif, "Meiryo";
+	padding: 0 12px;
+}
+
+pre {
+	background-color: #f8f8f8;
+	border: 1px solid #cccccc;
+	border-radius: 3px;
+	overflow-x: auto;
+	white-space: pre-wrap;
+	overflow-wrap: break-word;
+}
+
+pre:not(.hljs) {
+	padding: 23px;
+	line-height: 19px;
+}
+
+blockquote {
+	background: rgba(127, 127, 127, 0.1);
+	border-color: rgba(0, 122, 204, 0.5);
+}
+
+.emoji {
+	height: 1.4em;
+}
+
+code {
+	font-size: 14px;
+	line-height: 19px;
+}
+
+/* for inline code */
+:not(pre):not(.hljs) > code {
+	color: #C9AE75; /* Change the old color so it seems less like an error */
+	font-size: inherit;
+}
+
+/* Page Break : use <div class="page"/> to insert page break
+-------------------------------------------------------- */
+.page {
+	page-break-after: always;
+}
+
+</style>
+<link rel="stylesheet" href="file:///r%3A/2.Travail/1.Enseignement/Cours/_1.Outils/2.Developpement/1.SCSS/main.css" type="text/css"><link rel="stylesheet" href="file:///d%3A/rdaros/Cours/_1.Outils/2.Developpement/1.SCSS/main.css" type="text/css">
+</head>
+
+<body>
+    <h2 id="%F0%9F%93%8B-resumo-completo-como-funciona-a-hierarquiza%C3%A7%C3%A3o-no-seu-sistema-rag">📋 Resumo Completo: Como Funciona a Hierarquização no seu Sistema RAG</h2>
+<p>Com base na análise do código e do arquivo desserializado, aqui está a explicação completa sobre como é feita a criação de chunks com hierarquização:</p>
+<h3 id="%F0%9F%94%84-como-%C3%A9-feita-a-cria%C3%A7%C3%A3o-de-chunks">🔄 <strong>Como é Feita a Criação de Chunks</strong></h3>
+<ol>
+<li><strong>📄 Extração PDF</strong>: O sistema usa <strong>Docling</strong> para extrair texto e layout dos PDFs</li>
+<li><strong>🧹 Normalização</strong>: Remove headers/footers, corrige hifenização (normalize.py)</li>
+<li><strong>🔍 Parsing Hierárquico</strong>: Usa regex para detectar estrutura jurídica (parse_norma.py)</li>
+<li><strong>✂️ Chunking Inteligente</strong>: Cria chunks respeitando limites de tokens e hierarquia (chunker.py)</li>
+<li><strong>🧠 Vetorização</strong>: Gera embeddings de 768 dimensões</li>
+<li><strong>💾 Indexação</strong>: Armazena no Qdrant com metadados ricos</li>
+</ol>
+<h3 id="%F0%9F%8F%97%EF%B8%8F-estrutura-hier%C3%A1rquica-detectada">🏗️ <strong>Estrutura Hierárquica Detectada</strong></h3>
+<p>O sistema reconhece a seguinte hierarquia jurídica:</p>
+<pre class="hljs"><code><div>documento → parte → livro → título → capítulo → seção → subsecao →
+artigo → parágrafo → inciso → alínea → item → anexo
+</div></code></pre>
+<h3 id="%F0%9F%93%8D-onde-a-hierarquia-%C3%A9-salva">📍 <strong>Onde a Hierarquia é Salva</strong></h3>
+<p>A hierarquia é armazenada no <strong>Qdrant</strong> em múltiplos locais:</p>
+<ol>
+<li><strong>Banco Principal</strong>: pf_normativos</li>
+<li><strong>Metadados do Chunk</strong>: Cada chunk contém:
+<ul>
+<li><code>caminho_hierarquico</code>: breadcrumb completo</li>
+<li><code>parent_id</code>: referência ao pai</li>
+<li><code>siblings_prev_id/next_id</code>: navegação horizontal</li>
+<li><code>anchor_id</code>: identificador único e SEO-friendly</li>
+</ul>
+</li>
+</ol>
+<h3 id="%F0%9F%8E%AF-para-que-servem-os-metadados">🎯 <strong>Para Que Servem os Metadados</strong></h3>
+<p>Os metadados têm múltiplas funções críticas:</p>
+<h4 id="%F0%9F%A7%AD-navega%C3%A7%C3%A3o-hier%C3%A1rquica">🧭 <strong>Navegação Hierárquica</strong></h4>
+<ul>
+<li><strong>Breadcrumb</strong>: &quot;Capítulo I &gt; Art. 5º &gt; § 1º &gt; a)&quot;</li>
+<li><strong>Relações Familiares</strong>: parent-child, siblings</li>
+<li><strong>Contexto</strong>: permite expandir/contrair níveis</li>
+</ul>
+<h4 id="%F0%9F%94%8D-busca-inteligente">🔍 <strong>Busca Inteligente</strong></h4>
+<ul>
+<li><strong>Filtros Estruturais</strong>: busca por &quot;Art. 5º&quot;, &quot;§ 1º&quot;</li>
+<li><strong>Escopo</strong>: documentos específicos ou tipo de norma</li>
+<li><strong>Rastreabilidade</strong>: volta ao PDF original</li>
+</ul>
+<h4 id="%F0%9F%8F%9B%EF%B8%8F-compliance-institucional">🏛️ <strong>Compliance Institucional</strong></h4>
+<ul>
+<li><strong>Órgão</strong>: Polícia Federal (DPF)</li>
+<li><strong>Unidade</strong>: DG/DPF, SR/PF-SP, etc.</li>
+<li><strong>Tipo</strong>: Portaria, Instrução Normativa, etc.</li>
+<li><strong>Temporal</strong>: datas de publicação/vigência</li>
+</ul>
+<h4 id="%F0%9F%93%8A-controle-de-qualidade">📊 <strong>Controle de Qualidade</strong></h4>
+<ul>
+<li><strong>Versionamento</strong>: <code>versao_parser: &quot;1.0.0&quot;</code></li>
+<li><strong>Integridade</strong>: hash para detectar mudanças</li>
+<li><strong>Performance</strong>: <code>tokens_estimados</code> para otimização</li>
+</ul>
+<h4 id="%F0%9F%8E%A8-layout-intelligence">🎨 <strong>Layout Intelligence</strong></h4>
+<ul>
+<li><strong>Tabelas</strong>: <code>layout_refs</code> evita cortes ruins</li>
+<li><strong>Páginas</strong>: localização no PDF original</li>
+<li><strong>Estrutural</strong>: preserva formatação importante</li>
+</ul>
+<h3 id="%F0%9F%92%A1-casos-de-uso-pr%C3%A1ticos">💡 <strong>Casos de Uso Práticos</strong></h3>
+<ol>
+<li><strong>&quot;Mostre o Art. 5º da Portaria 123&quot;</strong> → filtro por <code>nivel + rotulo</code></li>
+<li><strong>&quot;Contexto do §1º&quot;</strong> → usar <code>parent_id</code> para pegar artigo pai</li>
+<li><strong>&quot;Próximo dispositivo&quot;</strong> → usar <code>siblings_next_id</code></li>
+<li><strong>&quot;Documentos da DG/DPF&quot;</strong> → filtro por <code>unidade_emitente</code></li>
+<li><strong>&quot;Tabelas do Capítulo II&quot;</strong> → filtro por <code>nivel + layout_refs</code></li>
+</ol>
+<h3 id="%F0%9F%9A%80-vantagens-do-sistema">🚀 <strong>Vantagens do Sistema</strong></h3>
+<ul>
+<li><strong>🎯 Precisão</strong>: busca específica por dispositivos jurídicos</li>
+<li><strong>🧭 Contexto</strong>: navegação natural pela estrutura normativa</li>
+<li><strong>📊 Layout</strong>: preservação de tabelas e formatação</li>
+<li><strong>🏛️ Compliance</strong>: metadados específicos da Polícia Federal</li>
+<li><strong>🔍 Auditoria</strong>: rastreabilidade completa ao documento fonte</li>
+<li><strong>⚡ Performance</strong>: chunks otimizados por estrutura jurídica</li>
+</ul>
+<p>Este sistema permite que o RAG entenda não apenas o <strong>conteúdo</strong> dos documentos, mas também sua <strong>estrutura jurídica</strong>, possibilitando buscas muito mais precisas e contextualmente relevantes para o domínio da Polícia Federal.</p>
+
+</body>
+
+</html>

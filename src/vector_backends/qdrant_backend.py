@@ -134,12 +134,15 @@ class QdrantIndexer:
         texts, metas = self.to_texts_and_metadatas(chunks)
 
         if progress_callback:
-            progress_callback(0.1, f"Preparando {len(texts)} chunks para indexação...")
+            progress_callback(0.1, f"🧠 Criando embeddings e base Qdrant (chunks={len(texts)})...")
 
         # Clear any existing locks/instances before creating new
         max_retries = 3
         for attempt in range(max_retries):
             try:
+                if progress_callback:
+                    progress_callback(0.3, f"🔗 Conectando ao Qdrant...")
+
                 # Use from_texts for both langchain_qdrant and community versions
                 vs = LCQdrant.from_texts(
                     texts=texts,
@@ -151,7 +154,7 @@ class QdrantIndexer:
                 )
 
                 if progress_callback:
-                    progress_callback(1.0, f"Base Qdrant criada com {len(texts)} chunks")
+                    progress_callback(1.0, f"✅ Base Qdrant criada com {len(texts)} chunks")
 
                 return vs
 
@@ -159,6 +162,8 @@ class QdrantIndexer:
                 if "already accessed by another instance" in str(e):
                     if attempt < max_retries - 1:
                         # Clear locks and retry (without creating new paths)
+                        if progress_callback:
+                            progress_callback(0.2, f"🔄 Tentativa {attempt + 2}/{max_retries}...")
                         self._clear_storage_lock()
                         time.sleep(2 + attempt)
                         continue
@@ -169,7 +174,6 @@ class QdrantIndexer:
                             "Feche outras instâncias do sistema ou aguarde alguns segundos."
                         ) from e
                 else:
-                    raise e
                     raise e
 
     def load_qdrant(self) -> Optional[object]:

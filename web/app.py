@@ -3,6 +3,10 @@ import sys
 import json
 import warnings
 import logging
+import sqlite3
+import pickle
+import base64
+from pathlib import Path
 
 # Suprimir warnings de PDF com cores inválidas
 warnings.filterwarnings('ignore', message='Cannot set gray non-stroke color')
@@ -49,6 +53,14 @@ def safe_extract_text(pdf_path: str):
 @st.cache_resource(show_spinner=False)
 def get_service() -> RAGService:
     return RAGService()
+
+@st.cache_resource(show_spinner=False)
+def get_searcher():
+    """Get searcher instance with database"""
+    service = get_service()
+    if service and hasattr(service, 'document_service') and service.document_service.database:
+        return Searcher(service.document_service.database)
+    return None
 
 def get_service_with_progress():
     """Initialize service with progress bar if needed"""
@@ -105,6 +117,465 @@ def get_service_with_progress():
             st.session_state['service_initialized'] = get_service()
 
     return st.session_state['service_initialized']
+
+# ============================================================================
+# FUNÇÕES PARA VISUALIZAÇÃO DE PONTOS E CHUNKS
+# ============================================================================
+
+@st.cache_data
+def get_qdrant_points(offset=0, limit=10):
+    """Busca pontos do banco Qdrant com paginação"""
+    db_path = Path("qdrantDB/collection/pf_normativos/storage.sqlite")
+
+    if not db_path.exists():
+        return [], 0
+
+    try:
+        conn = sqlite3.connect(str(db_path))
+        cursor = conn.cursor()
+
+        # Total de registros
+        cursor.execute("SELECT COUNT(*) FROM points")
+        total = cursor.fetchone()[0]
+
+        # Buscar registros com paginação
+        cursor.execute("SELECT id, point FROM points LIMIT ? OFFSET ?", (limit, offset))
+        records = cursor.fetchall()
+
+        points = []
+        for encoded_id, point_blob in records:
+            try:
+                decoded_id = pickle.loads(base64.b64decode(encoded_id))
+                point_data = pickle.loads(point_blob)
+
+                # Extrair informações básicas
+                info = {
+                    'id': decoded_id,
+                    'point_id': getattr(point_data, 'id', None),
+                    'payload': getattr(point_data, 'payload', {}),
+                    'vector_size': 0,
+                    'text_preview': '',
+                    'metadata': {},
+                    'raw_data': point_data
+                }
+
+                # Processar payload
+                if info['payload']:
+                    if 'page_content' in info['payload']:
+                        text = info['payload']['page_content']
+                        info['text_preview'] = text[:200] + "..." if len(text) > 200 else text
+
+                    if 'metadata' in info['payload']:
+                        info['metadata'] = info['payload']['metadata']
+
+                # Processar vetor
+                if hasattr(point_data, 'vector') and point_data.vector:
+                    if isinstance(point_data.vector, dict) and 'vector' in point_data.vector:
+                        vector = point_data.vector['vector']
+                    elif isinstance(point_data.vector, list):
+                        vector = point_data.vector
+                    else:
+                        vector = point_data.vector
+
+                    if isinstance(vector, list):
+                        info['vector_size'] = len(vector)
+
+                points.append(info)
+
+            except Exception as e:
+                st.error(f"Erro ao processar ponto: {e}")
+                continue
+
+        conn.close()
+        return points, total
+
+    except Exception as e:
+        st.error(f"Erro ao acessar banco: {e}")
+        return [], 0
+
+def render_points_browser():
+    """Renderiza o navegador de pontos do Qdrant"""
+    st.title("🔍 Navegador de Pontos Qdrant")
+    st.markdown("Explore os pontos indexados no banco vetorial com busca e filtros avançados")
+
+    # Verificar se o banco existe
+    db_path = Path("qdrantDB/collection/pf_normativos/storage.sqlite")
+    if not db_path.exists():
+        st.error("❌ Banco Qdrant não encontrado. Execute a indexação primeiro.")
+        return
+
+    # Filtros e busca
+    with st.container():
+        st.markdown("### 🔍 Filtros e Busca")
+
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            search_text = st.text_input(
+                "🔎 Buscar no texto",
+                placeholder="Digite palavras-chave...",
+                help="Busca no conteúdo dos chunks"
+            )
+
+        with col2:
+            nivel_filter = st.selectbox(
+                "📊 Filtrar por nível",
+                ["Todos", "artigo", "paragrafo", "inciso", "alinea", "capitulo", "secao", "titulo", "anexo"],
+                help="Filtrar por nível hierárquico"
+            )
+
+        with col3:
+            doc_filter = st.selectbox(
+                "📁 Filtrar por documento",
+                ["Todos"] + ["LEI 8112.pdf", "IN 289.pdf", "Emenda Constitucional nº 103.pdf", "Instrução-normativa-100-dg-dpf-22-março-2016.pdf"],
+                help="Filtrar por documento origem"
+            )
+
+    # Configurações de paginação
+    col1, col2, col3 = st.columns([1, 1, 2])
+
+    with col1:
+        page_size = st.selectbox("Itens por página", [5, 10, 20, 50], index=1)
+
+    with col2:
+        if 'current_page' not in st.session_state:
+            st.session_state.current_page = 0
+
+        # Buscar total para calcular páginas
+        _, total = get_qdrant_points(0, 1)
+        total_pages = max(1, (total + page_size - 1) // page_size)
+
+        page_input = st.number_input(
+            f"Página (1-{total_pages})",
+            min_value=1,
+            max_value=total_pages,
+            value=st.session_state.current_page + 1
+        )
+        st.session_state.current_page = page_input - 1
+
+    with col3:
+        st.info(f"📊 Total: {total:,} pontos • Página {page_input} de {total_pages}")
+
+    # Buscar pontos
+    offset = st.session_state.current_page * page_size
+    points, _ = get_qdrant_points(offset, page_size)
+
+    # Aplicar filtros no frontend (para simplificar)
+    if search_text or nivel_filter != "Todos" or doc_filter != "Todos":
+        filtered_points = []
+        for point in points:
+            # Filtro de texto
+            if search_text:
+                text_content = point.get('text_preview', '') + str(point.get('payload', {}).get('page_content', ''))
+                if search_text.lower() not in text_content.lower():
+                    continue
+
+            # Filtro de nível
+            if nivel_filter != "Todos":
+                metadata = point.get('metadata', {})
+                if metadata.get('nivel') != nivel_filter:
+                    continue
+
+            # Filtro de documento
+            if doc_filter != "Todos":
+                metadata = point.get('metadata', {})
+                origem = metadata.get('origem_pdf', {})
+                arquivo = origem.get('arquivo', '') if isinstance(origem, dict) else ''
+                if doc_filter not in arquivo:
+                    continue
+
+            filtered_points.append(point)
+
+        points = filtered_points
+        st.info(f"🔍 Filtros aplicados: {len(points)} pontos encontrados")
+
+    if not points:
+        st.warning("Nenhum ponto encontrado com os filtros aplicados.")
+        return
+
+    # Navegação melhorada
+    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+
+    with col1:
+        if st.button("⏮️ Primeira", disabled=st.session_state.current_page <= 0):
+            st.session_state.current_page = 0
+            st.rerun()
+
+    with col2:
+        if st.button("⬅️ Anterior", disabled=st.session_state.current_page <= 0):
+            st.session_state.current_page -= 1
+            st.rerun()
+
+    with col3:
+        if st.button("➡️ Próxima", disabled=st.session_state.current_page >= total_pages - 1):
+            st.session_state.current_page += 1
+            st.rerun()
+
+    with col4:
+        if st.button("⏭️ Última", disabled=st.session_state.current_page >= total_pages - 1):
+            st.session_state.current_page = total_pages - 1
+            st.rerun()
+
+    # Lista de pontos
+    st.markdown("### 📋 Pontos Encontrados")
+
+    for i, point in enumerate(points):
+        with st.container():
+            # Card do ponto com design moderno
+            st.markdown(f"""
+            <div style="
+                border: 1px solid #e0e4e7;
+                border-radius: 12px;
+                padding: 20px;
+                margin: 12px 0;
+                background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+                box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+                transition: all 0.3s ease;
+                border-left: 4px solid #1f77b4;
+            ">
+            """, unsafe_allow_html=True)
+
+            # Header do card
+            col1, col2, col3 = st.columns([3, 1, 1])
+
+            with col1:
+                # Título baseado nos metadados
+                metadata = point['metadata']
+                if isinstance(metadata, dict):
+                    nivel = metadata.get('nivel', 'documento')
+                    rotulo = metadata.get('rotulo', '')
+
+                    # Ícones por nível
+                    nivel_icons = {
+                        'artigo': '📜',
+                        'paragrafo': '📝',
+                        'inciso': '📋',
+                        'alinea': '🔤',
+                        'capitulo': '📚',
+                        'secao': '📑',
+                        'titulo': '📖',
+                        'anexo': '📎'
+                    }
+                    icon = nivel_icons.get(nivel, '📄')
+
+                    title = f"{nivel.title()}"
+                    if rotulo:
+                        title += f" • {rotulo}"
+                else:
+                    title = f"Ponto {offset + i + 1}"
+                    icon = '🧩'
+
+                st.markdown(f"**{icon} {title}**")
+
+                # Preview do texto
+                if point['text_preview']:
+                    st.markdown(f"<div style='color: #666; font-style: italic; margin-top: 8px;'>{point['text_preview']}</div>", unsafe_allow_html=True)
+
+            with col2:
+                # Métricas com ícones
+                vector_info = f"{point['vector_size']}D" if point['vector_size'] else "N/A"
+                st.markdown(f"""
+                <div style="text-align: center;">
+                    <div style="font-size: 24px; color: #1f77b4;">🔢</div>
+                    <div style="font-weight: bold; color: #333;">{vector_info}</div>
+                    <div style="font-size: 12px; color: #666;">Embedding</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                # Botão estilizado para ver detalhes
+                detail_clicked = st.button(
+                    "👁️ Detalhes",
+                    key=f"detail_{point['id']}",
+                    help="Ver detalhes completos",
+                    type="secondary"
+                )
+                if detail_clicked:
+                    st.session_state.selected_point = point
+                    st.session_state.show_detail = True
+                    st.rerun()
+
+            # Informações rápidas com badges
+            if isinstance(metadata, dict):
+                badges = []
+
+                # Arquivo origem
+                if 'origem_pdf' in metadata and isinstance(metadata['origem_pdf'], dict):
+                    arquivo = metadata['origem_pdf'].get('arquivo', '')
+                    if arquivo:
+                        arquivo = os.path.basename(arquivo)
+                        badges.append(f"📁 {arquivo}")
+
+                # Tokens
+                if 'tokens_estimados' in metadata:
+                    badges.append(f"🔤 {metadata['tokens_estimados']} tokens")
+
+                # Páginas
+                if 'origem_pdf' in metadata and isinstance(metadata['origem_pdf'], dict):
+                    paginas = metadata['origem_pdf'].get('paginas', [])
+                    if paginas and len(paginas) > 0:
+                        badges.append(f"📄 {len(paginas)} páginas")
+
+                if badges:
+                    badge_html = " • ".join([f"<span style='background: #e3f2fd; padding: 2px 8px; border-radius: 12px; font-size: 12px; color: #1565c0;'>{badge}</span>" for badge in badges])
+                    st.markdown(f"<div style='margin-top: 12px;'>{badge_html}</div>", unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+    # Modal de detalhes
+    if st.session_state.get('show_detail', False) and 'selected_point' in st.session_state:
+        render_point_detail_modal()
+
+def render_point_detail_modal():
+    """Renderiza modal com detalhes completos do ponto"""
+    point = st.session_state.selected_point
+
+    # Header do modal
+    col1, col2 = st.columns([4, 1])
+
+    with col1:
+        st.markdown("### 🔍 Detalhes do Ponto")
+
+    with col2:
+        if st.button("❌ Fechar", key="close_modal"):
+            st.session_state.show_detail = False
+            if 'selected_point' in st.session_state:
+                del st.session_state.selected_point
+            st.rerun()
+
+    # Container estilizado para o modal
+    with st.container():
+        st.markdown("""
+        <div style="
+            border: 2px solid #1f77b4;
+            border-radius: 10px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            margin: 10px 0;
+        ">
+        """, unsafe_allow_html=True)
+
+        # Abas de conteúdo
+        tab1, tab2, tab3, tab4 = st.tabs(["📄 Texto", "🏷️ Metadados", "🔢 Vetor", "🧬 Raw Data"])
+
+        with tab1:
+            st.subheader("📄 Conteúdo do Texto")
+            if point['payload'] and 'page_content' in point['payload']:
+                text = point['payload']['page_content']
+                st.markdown(f"**Tamanho:** {len(text)} caracteres")
+                st.text_area("Texto completo:", value=text, height=400, key="text_content")
+            else:
+                st.info("Nenhum texto encontrado no payload.")
+
+        with tab2:
+            st.subheader("🏷️ Metadados Estruturados")
+            metadata = point['metadata']
+
+            if isinstance(metadata, dict) and metadata:
+                # Informações principais
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    if 'nivel' in metadata:
+                        st.metric("📊 Nível", metadata['nivel'])
+                    if 'rotulo' in metadata:
+                        st.metric("🏷️ Rótulo", metadata['rotulo'])
+                    if 'tokens_estimados' in metadata:
+                        st.metric("🔤 Tokens", metadata['tokens_estimados'])
+
+                with col2:
+                    if 'origem_pdf' in metadata and isinstance(metadata['origem_pdf'], dict):
+                        origem = metadata['origem_pdf']
+                        if 'arquivo' in origem:
+                            arquivo = os.path.basename(origem['arquivo'])
+                            st.metric("📁 Arquivo", arquivo)
+                        if 'paginas' in origem and isinstance(origem['paginas'], list):
+                            st.metric("📄 Páginas", len(origem['paginas']))
+
+                # Hierarquia
+                if 'caminho_hierarquico' in metadata:
+                    st.subheader("🗂️ Caminho Hierárquico")
+                    caminho = metadata['caminho_hierarquico']
+                    if isinstance(caminho, list):
+                        for i, item in enumerate(caminho):
+                            if isinstance(item, dict):
+                                nivel = item.get('nivel', 'N/A')
+                                rotulo = item.get('rotulo', '')
+                                st.markdown(f"**{i+1}.** {nivel}" + (f" - {rotulo}" if rotulo else ""))
+
+                # Metadados completos
+                with st.expander("🔍 Metadados Completos"):
+                    st.json(metadata)
+            else:
+                st.info("Nenhum metadado estruturado encontrado.")
+
+        with tab3:
+            st.subheader("🔢 Embedding Vetorial")
+            raw_data = point['raw_data']
+
+            if hasattr(raw_data, 'vector') and raw_data.vector:
+                if isinstance(raw_data.vector, dict) and 'vector' in raw_data.vector:
+                    vector = raw_data.vector['vector']
+                elif isinstance(raw_data.vector, list):
+                    vector = raw_data.vector
+                else:
+                    vector = raw_data.vector
+
+                if isinstance(vector, list):
+                    st.metric("🔢 Dimensões", len(vector))
+
+                    # Visualização do vetor
+                    col1, col2 = st.columns(2)
+
+                    with col1:
+                        st.subheader("🎯 Primeiros 10 valores")
+                        for i, val in enumerate(vector[:10]):
+                            st.write(f"{i+1}: {val:.6f}")
+
+                    with col2:
+                        st.subheader("🎯 Últimos 10 valores")
+                        start_idx = len(vector) - 10
+                        for i, val in enumerate(vector[-10:]):
+                            st.write(f"{start_idx + i + 1}: {val:.6f}")
+
+                    # Gráfico simples dos primeiros valores (se matplotlib disponível)
+                    try:
+                        import matplotlib.pyplot as plt
+                        fig, ax = plt.subplots(1, 1, figsize=(10, 4))
+                        ax.plot(vector[:50], marker='o', markersize=2)
+                        ax.set_title("Primeiros 50 valores do embedding")
+                        ax.set_xlabel("Dimensão")
+                        ax.set_ylabel("Valor")
+                        ax.grid(True, alpha=0.3)
+                        st.pyplot(fig)
+                    except ImportError:
+                        st.info("Matplotlib não disponível para visualização do gráfico")
+                else:
+                    st.info(f"Vetor encontrado mas formato não reconhecido: {type(vector)}")
+            else:
+                st.info("Nenhum vetor encontrado neste ponto.")
+
+        with tab4:
+            st.subheader("🧬 Dados Brutos")
+            st.markdown("**Tipo do objeto:** " + str(type(point['raw_data'])))
+            st.markdown("**ID do ponto:** " + str(point['point_id']))
+
+            # Payload completo
+            if point['payload']:
+                with st.expander("📦 Payload Completo"):
+                    st.json(point['payload'])
+
+            # Informações técnicas
+            with st.expander("⚙️ Informações Técnicas"):
+                st.json({
+                    'id': str(point['id']),
+                    'point_id': str(point['point_id']),
+                    'vector_size': point['vector_size'],
+                    'payload_keys': list(point['payload'].keys()) if point['payload'] else []
+                })
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
 st.title("🛡️ Sistema RAG-PF — Interface Web")
 st.caption("Consulta inteligente a espécies normativas da Polícia Federal (RAG)")
@@ -197,6 +668,41 @@ def format_breadcrumb(md: dict) -> str:
     # Fallbacks
     return md.get("rotulo") or "Trecho"
 
+# ============================================================================
+# SISTEMA DE NAVEGAÇÃO
+# ============================================================================
+
+# Inicializar estado da sessão
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 0
+if 'show_detail' not in st.session_state:
+    st.session_state.show_detail = False
+if 'current_route' not in st.session_state:
+    st.session_state.current_route = 'home'
+
+# Navegação principal
+st.sidebar.title("🧭 Navegação")
+navigation = st.sidebar.radio(
+    "Selecione a seção:",
+    ["🏠 Consulta RAG", "🔍 Navegador de Pontos"],
+    index=0 if st.session_state.current_route == 'home' else 1
+)
+
+# Atualizar rota baseado na navegação
+if navigation == "🔍 Navegador de Pontos":
+    if st.session_state.current_route != 'points':
+        st.session_state.current_route = 'points'
+        st.rerun()
+else:
+    if st.session_state.current_route != 'home':
+        st.session_state.current_route = 'home'
+        st.rerun()
+
+# Renderizar página baseada na navegação
+if st.session_state.current_route == 'points':
+    render_points_browser()
+    st.stop()  # Para não continuar com o resto da interface
+
 # Connectivity status
 connected, err = OllamaService.check_connection()
 status_col1, status_col2 = st.columns([1, 3])
@@ -213,7 +719,8 @@ with status_col2:
 
 # Sidebar options
 with st.sidebar:
-    st.header("Configurações")
+    st.markdown("---")
+    st.header("⚙️ Configurações")
     show_retrieval = st.toggle("Mostrar trechos relevantes", value=True)
     top_k = st.slider("Top-K", min_value=3, max_value=10, value=5, step=1)
     export_jsonl = st.toggle("Exportar JSONL dos chunks", value=True)
@@ -487,3 +994,57 @@ if btn and query.strip():
 
 st.markdown("---")
 st.caption("Executa 100% local. Modelos via Ollama local e indexação FAISS/Qdrant em disco.")
+
+# ============================================================================
+# FUNÇÕES AUXILIARES PARA INTERFACE
+# ============================================================================
+
+def render_sidebar():
+    """Renderiza a barra lateral com informações do sistema"""
+    with st.sidebar:
+        st.markdown("---")
+        st.subheader("📊 Status do Sistema")
+
+        # Verificar status do serviço
+        try:
+            service = get_service()
+            if service:
+                searcher = get_searcher()
+                if searcher and hasattr(searcher, 'db') and searcher.db is not None:
+                    # Para Qdrant, tentar obter contagem
+                    try:
+                        if hasattr(searcher.db, '_client'):
+                            # Qdrant
+                            result = searcher.db._client.count(collection_name="pf_normativos")
+                            total_docs = result.count
+                        else:
+                            # FAISS
+                            total_docs = searcher.db.index.ntotal if hasattr(searcher.db, 'index') else 0
+                        st.success(f"✅ Sistema ativo\n📄 {total_docs} documentos indexados")
+                    except:
+                        st.success("✅ Sistema ativo")
+                else:
+                    st.info("📊 Sistema em inicialização")
+            else:
+                st.warning("⚠️ Sistema não inicializado")
+        except Exception as e:
+            st.error(f"❌ Erro no sistema: {str(e)}")
+
+        # Controles de limpeza
+        st.markdown("---")
+        st.subheader("🧹 Manutenção")
+
+        if st.button("🗑️ Limpar Cache"):
+            st.cache_resource.clear()
+            st.rerun()
+
+def render_main_interface():
+    """Renderiza a interface principal"""
+    render_sidebar()
+
+def main():
+    """Função principal da aplicação"""
+    render_main_interface()
+
+if __name__ == "__main__":
+    main()
